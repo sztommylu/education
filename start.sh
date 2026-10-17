@@ -25,7 +25,7 @@ if [[ ! -x "$PYTHON" ]]; then
 fi
 
 export PYTHONUNBUFFERED=1
-export ALLOWED_HOSTS="${ALLOWED_HOSTS:-localhost,127.0.0.1}"
+export ALLOWED_HOSTS="${ALLOWED_HOSTS:-localhost,127.0.0.1,192.168.31.6,172.17.65.13}"
 # 串行执行停止和启动，防止多个启动命令产生重复 worker。
 if ! command -v flock >/dev/null 2>&1; then
     echo "缺少 flock，请先安装 util-linux。" >&2
