@@ -1,0 +1,25 @@
+<div id="handwriting-practice">
+<noscript><p>请开启浏览器 JavaScript 后使用手写答题。</p></noscript>
+{% if dictation_items %}<form method="post" id="handwriting-form">
+{% csrf_token %}<input type="hidden" name="operation" value="submit_handwriting_draft">
+<input type="hidden" name="revision" value="{{ handwriting_state.revision }}">
+{{ form.errors }}
+{{ handwriting_state|json_script:'handwriting-state' }}
+{{ dictation_items|json_script:'handwriting-items' }}
+<div id="handwriting-runner" hidden>
+<div class="handwriting-question">
+<p id="handwriting-position" class="muted"></p>
+<h3 id="handwriting-prompt" tabindex="-1"></h3>
+<canvas id="handwriting-canvas" class="handwriting-pad" width="1600" height="400" aria-label="请根据中文提示手写英文"></canvas>
+<div class="form-actions"><button type="button" class="button outline" data-undo>撤销一笔</button><button type="button" class="button outline" data-clear>清空本题</button></div>
+</div>
+<div class="form-actions">
+<button type="button" class="button outline" id="handwriting-previous">上一题</button>
+<button type="button" class="button" id="handwriting-save">保存本题</button>
+<button type="button" class="button outline" id="handwriting-next">下一题</button>
+</div>
+</div>
+<p id="handwriting-status" class="muted" role="status" aria-live="polite"></p>
+</form>{% else %}<p>任务尚未配置有效中文提示，请家长按“英文##中文##”的格式重新布置任务。</p>{% endif %}
+</div>
+{% if translation_task and dictation_items %}<div class="handwriting-submit-actions" data-outside-task-card><button type="submit" form="handwriting-form" class="button" id="handwriting-submit" disabled>提交 AI 批改</button></div>{% endif %}

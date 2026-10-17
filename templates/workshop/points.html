@@ -1,0 +1,10 @@
+{% extends 'workshop/base.html' %}{% load growth %}
+{% block breadcrumb %}{% if user.is_parent %}学生积分{% else %}我的积分{% endif %}{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow">EVERY TASK COUNTS</div><h1>{% if user.is_parent %}{{ child }}的积分{% else %}我的积分{% endif %}</h1><p>每完成一个英语任务，获得 10 积分。</p></div></div>
+<section class="wallet-hero"><div><span>积分余额</span><h2>{{ wallet.points }} <small>积分</small></h2><p>1 积分＝1 元 <span>·</span> 对应价值 ¥{{ wallet.points_value_cents|money }}</p><p>可用 {{ wallet.available_points }} 积分 <span>·</span> 冻结 {{ wallet.frozen_points }} 积分</p></div><span class="wallet-art">⭐</span></section>
+<section class="panel"><h2>积分记录</h2><p class="muted">记录英语任务奖励、家长发放的额外福利和积分提现。</p>
+{% for entry in entries %}<div class="record"><div><strong>{% if entry.task_id %}<a href="{% url 'task_detail' entry.task_id %}">{{ entry.reason }}</a>{% else %}{{ entry.reason }}{% endif %}</strong><small>{{ entry.created_at|date:'Y-m-d H:i' }} · {% if entry.extra_benefit_id %}额外福利{% elif entry.withdrawal_id %}积分提现{% elif entry.task.settlement.source == 'ai' %}AI 批改通过{% else %}家长确认完成{% endif %}</small></div><span class="amount{% if entry.points > 0 %} positive{% endif %}">{{ entry.points|sign }} 积分</span></div>
+{% empty %}<div class="empty compact">完成英语任务，等待第一笔积分到账。</div>{% endfor %}
+</section>{% include 'workshop/pagination.html' with page=entries %}
+{% endblock %}

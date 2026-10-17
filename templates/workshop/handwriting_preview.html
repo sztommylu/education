@@ -1,0 +1,5 @@
+{% load growth %}
+{% if preview %}
+{{ preview|handwriting_preview|json_script:preview_id }}
+<div class="handwriting-saved" data-source="{{ preview_id }}"></div>
+{% endif %}

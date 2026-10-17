@@ -1,0 +1,1 @@
+{% extends 'workshop/base.html' %}{% block content %}<section class="panel empty"><span>🌱</span><h1>{% if parent_missing %}还没有关联孩子{% else %}等待身份授权{% endif %}</h1><p>请管理员为你配置业务角色和明确的家长与孩子关联。</p><p>配置完成后，请重新登录。</p>{% if user.is_staff %}<a class="button" href="/admin/">进入系统管理</a>{% endif %}</section>{% endblock %}

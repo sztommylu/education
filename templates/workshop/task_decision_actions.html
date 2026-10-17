@@ -1,0 +1,9 @@
+{% if user.is_parent and task.current_id %}{% if task.phase == 'waiting' or task.phase == 'passed' %}
+<form class="task-decision-actions" method="post" action="{% url 'task_decision' task.pk %}?{{ request.GET.urlencode }}">
+  {% csrf_token %}
+  <input type="hidden" name="version" value="{{ task.current_id }}">
+  {% if decision_detail %}<input type="hidden" name="return_to" value="detail">{% endif %}
+  <button class="button outline danger" name="decision" value="revision" data-confirm="退回后，学生需要修改并重新提交，确认？">待修改</button>
+  <button class="button outline" name="decision" value="complete" data-confirm="{% if task.subject.name == '英语' %}确认该任务已完成？将为学生发放 10 积分。{% else %}确认该任务已完成？{% endif %}">完成</button>
+</form>
+{% endif %}{% endif %}

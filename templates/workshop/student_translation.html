@@ -1,0 +1,20 @@
+{% load growth %}
+<div class="student-vocabulary">
+  <noscript><p>请开启浏览器 JavaScript 后使用手写答题。</p></noscript>
+  <section class="vocabulary-section">
+    <h3>课本翻译 · 共 {{ dictation_items|length }} 题</h3>
+    {% if dictation_items %}
+      {% if handwriting_practice %}<details><summary>查看中文题目（{{ dictation_items|length }} 题）</summary>{% endif %}
+      <ol>{% for item in dictation_items %}<li>{{ item.prompt|linebreaksbr }}</li>{% endfor %}</ol>
+      {% if handwriting_practice %}</details>{% endif %}
+    {% else %}<p class="muted">任务尚未配置有效课本内容。</p>{% endif %}
+    {% if handwriting_practice %}
+      <p class="muted" data-category-progress="课本翻译">已保存 0 / {{ dictation_items|length }} 题</p>
+      <button type="button" class="button" data-start-category="课本翻译" {% if not dictation_items %}disabled{% endif %}>开始手写</button>
+    {% endif %}
+    {% if translation_pending %}<div data-handwriting-pending><h3>AI 正在批改</h3><p class="muted">手写译文已保存，批改完成后自动显示结果。</p></div>
+    {% elif student_submission and translation_review %}<div class="review-block"><strong>AI 批改结果 · {{ translation_review.grade|review_result }}</strong><p>{{ translation_review.reason|linebreaksbr }}</p><p>{{ translation_review.suggestions|linebreaksbr }}</p></div>
+    {% elif student_submission and current_job.status == 'parent' %}<p class="muted">{{ current_job.public_error }}</p>{% endif %}
+  </section>
+</div>
+{% if completion %}{% include 'workshop/student_completion.html' %}{% endif %}

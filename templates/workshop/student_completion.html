@@ -1,0 +1,27 @@
+{% load growth %}
+<section class="panel">
+<h2>当前完成结果</h2>
+<p><strong>{{ task.child }} · {{ completion.status }}</strong></p>
+<p class="muted">已保存 {{ completion.saved }} / {{ completion.total }} 题。这里展示学生已保存的答案。</p>
+{% for section in completion.sections %}
+<div class="content-block">
+<h3>{{ section.label }} · 已保存 {{ section.saved }} / {{ section.total }} 题</h3>
+{% for item in section.items %}
+<details class="completion-answer">
+<summary>{{ item.number }}. {{ item.prompt }} <span class="badge {% if item.saved %}green{% else %}neutral{% endif %}">{% if item.saved %}已保存{% else %}未完成{% endif %}</span></summary>
+{% if item.saved %}
+{{ item.strokes|json_script:item.script_id }}
+<canvas class="handwriting-pad" width="1600" height="400" data-handwriting-strokes="{{ item.script_id }}" aria-label="{{ item.prompt }}：学生已保存的笔迹"></canvas>
+{% if item.recognized != None %}<p>识别原文：{{ item.recognized|default:'（未识别出文字）' }} <span class="muted">· OCR 置信度 {{ item.confidence_percent }}%</span></p>
+{% else %}<p class="muted">答案已保存，提交批改后显示识别结果。</p>{% endif %}
+{% else %}<p class="muted">学生尚未保存本题答案。</p>{% endif %}
+</details>
+{% empty %}<p class="muted">未布置此类题目。</p>{% endfor %}
+</div>
+{% endfor %}
+{% if completion.submitted %}
+{% if completion_review %}<div class="review-block"><strong>{% if completion_review.source == 'ai' %}AI{% else %}家长{% endif %}批改结果 · {{ completion_review.grade|review_result }}</strong><p>{{ completion_review.reason|linebreaksbr }}</p><p>{{ completion_review.suggestions|linebreaksbr }}</p></div>
+{% elif current_job.status == 'parent' %}<p class="muted">{{ current_job.public_error|default:'请家长审核本次提交。' }}</p>
+{% else %}<p class="muted">本次答案已提交，正在等待批改结果。</p>{% endif %}
+{% endif %}
+</section>

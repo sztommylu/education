@@ -1,0 +1,8 @@
+{% extends 'workshop/base.html' %}{% load growth %}
+{% block breadcrumb %}额外福利{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow">A LITTLE EXTRA ENCOURAGEMENT</div><h1>额外福利</h1><p>为 {{ child }} 的额外努力增加积分，1 积分＝1 元。</p></div><a class="text-link" href="{% url 'points' %}?child={{ child.pk }}">当前积分 {{ wallet.points }} →</a></div>
+<section class="panel"><h2>发放积分</h2><form method="post">{% csrf_token %}<input type="hidden" name="child" value="{{ child.pk }}">{{ form.as_p }}<button class="button" data-confirm="确认向 {{ child }} 发放本次额外福利积分？">确认发放积分</button></form></section>
+<section class="panel"><h2>发放记录</h2>{% for grant in grants %}<div class="record"><div><strong>{{ grant.reason }}</strong><small>{{ grant.created_at|date:'Y-m-d H:i' }} · {{ grant.parent }}</small></div><span class="amount positive">+{{ grant.points }} 积分</span></div>{% empty %}<p class="empty compact">还没有额外福利记录。</p>{% endfor %}</section>
+{% include 'workshop/pagination.html' with page=grants %}
+{% endblock %}

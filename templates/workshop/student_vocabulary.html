@@ -1,0 +1,10 @@
+<div class="student-vocabulary">
+  {% for section in sections %}
+  <section class="vocabulary-section">
+    <h3>{{ section.label }}</h3>
+    {% if section.items %}{% if practice_controls %}<details><summary>查看中文题目（{{ section.items|length }} 题）</summary>{% endif %}<ol>{% for item in section.items %}<li>{{ item }}</li>{% endfor %}</ol>{% if practice_controls %}</details>{% endif %}
+    {% else %}<p class="muted">暂无可显示的中文内容</p>{% endif %}
+    {% if practice_controls %}<p class="muted" data-category-progress="{{ section.label }}">已保存 0 / {{ section.items|length }} 题</p><button type="button" class="button" data-start-category="{{ section.label }}" {% if not section.items %}disabled{% endif %}>开始</button>{% endif %}
+  </section>
+  {% endfor %}
+</div>

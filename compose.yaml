@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: growth
+      POSTGRES_USER: growth
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U growth]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  web:
+    build: .
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: growth
+      POSTGRES_USER: growth
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:8000:8000
+    volumes:
+      - private_media:/app/private_media
+      - staticfiles:/app/staticfiles
+    restart: unless-stopped
+  worker:
+    build: .
+    command: [python, manage.py, worker]
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: growth
+      POSTGRES_USER: growth
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - private_media:/app/private_media
+    restart: unless-stopped
+volumes:
+  database:
+  private_media:
+  staticfiles:

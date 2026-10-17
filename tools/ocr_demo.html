@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>英文手写 OCR 试写</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f6f4;color:#19382b;font:16px/1.6 system-ui,sans-serif}main{max-width:960px;margin:40px auto;padding:24px}h1{font-size:28px;margin:0 0 8px}.muted{color:#5b6d64}canvas{display:block;width:100%;height:auto;aspect-ratio:4/1;background:white;border:2px solid #93b5a1;border-radius:12px;touch-action:none;cursor:crosshair}button,.upload{display:inline-block;border:1px solid #adc0b5;border-radius:8px;padding:10px 18px;background:white;color:#19382b;font:inherit;cursor:pointer}button.primary{background:#246449;color:white}button:disabled{opacity:.5;cursor:wait}.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:16px 0}.result{background:white;border-radius:12px;padding:24px;margin-top:20px}#text{font-size:32px;white-space:pre-wrap;overflow-wrap:anywhere}#preview{display:none;max-width:100%;max-height:180px;margin:12px 0}input[type=file]{max-width:100%}#status{min-height:26px}label{cursor:pointer}@media(max-width:600px){main{margin:12px auto;padding:16px}}
+</style>
+<main>
+<h1>英文手写 OCR 试写</h1>
+<p class="muted">每次写一个单词或一行英文，可用鼠标、手写笔或手指。识别在本机运行，不调用 AI。</p>
+<canvas id="pad" width="1600" height="400" aria-label="英文手写区域"></canvas>
+<div class="controls"><button id="recognize" class="primary">识别手写</button><button id="undo">撤销一笔</button><button id="clear">清空</button><label>笔粗 <input id="width" type="range" min="3" max="12" value="5"></label></div>
+<label>也可以上传单个单词／单行英文图片（最多 5 MB）：<input id="file" type="file" accept="image/png,image/jpeg,image/webp"></label>
+<img id="preview" alt="待识别图片预览">
+<p id="status" role="status" aria-live="polite">等待书写</p>
+<section class="result" aria-live="polite"><div class="muted">原始识别结果（不自动纠正拼写）</div><div id="text">—</div><p id="details" class="muted"></p></section>
+<p class="muted">置信度是模型对本次输出的评分，不等于实际准确率。可试写 apple 和 aple，观察是否能保留拼写错误。上传整页或多行文字不适合本试写模型。</p>
+</main>
+<script>
+const pad=document.querySelector('#pad'),ctx=pad.getContext('2d');
+const status=document.querySelector('#status'),text=document.querySelector('#text'),details=document.querySelector('#details');
+const file=document.querySelector('#file'),preview=document.querySelector('#preview');
+let strokes=[],current=null,pointer=null,busy=false,previewURL=null;
+function paint(){ctx.fillStyle='#fff';ctx.fillRect(0,0,pad.width,pad.height);ctx.strokeStyle='#17221c';ctx.fillStyle='#17221c';ctx.lineCap='round';ctx.lineJoin='round';for(const s of strokes){ctx.lineWidth=s.width;ctx.beginPath();ctx.moveTo(...s.points[0]);for(const p of s.points.slice(1))ctx.lineTo(...p);ctx.stroke();if(s.points.length===1){ctx.beginPath();ctx.arc(...s.points[0],s.width/2,0,Math.PI*2);ctx.fill();}}}
+function point(e){const r=pad.getBoundingClientRect();return [(e.clientX-r.left)*pad.width/r.width,(e.clientY-r.top)*pad.height/r.height];}
+function resetResult(){text.textContent='—';details.textContent='';status.textContent='等待识别';}
+function clearUpload(){file.value='';preview.style.display='none';if(previewURL)URL.revokeObjectURL(previewURL);previewURL=null;}
+pad.addEventListener('pointerdown',e=>{if(busy||pointer!==null)return;e.preventDefault();clearUpload();resetResult();pointer=e.pointerId;pad.setPointerCapture(pointer);current={width:Number(document.querySelector('#width').value),points:[point(e)]};strokes.push(current);paint();});
+pad.addEventListener('pointermove',e=>{if(e.pointerId!==pointer||!current)return;current.points.push(point(e));paint();});
+function end(e){if(e.pointerId===pointer){pointer=null;current=null;}}
+pad.addEventListener('pointerup',end);pad.addEventListener('pointercancel',end);pad.addEventListener('lostpointercapture',end);
+document.querySelector('#undo').onclick=()=>{if(busy)return;strokes.pop();clearUpload();resetResult();paint();};
+document.querySelector('#clear').onclick=()=>{if(busy)return;strokes=[];clearUpload();resetResult();paint();};
+file.onchange=()=>{resetResult();if(previewURL)URL.revokeObjectURL(previewURL);preview.style.display='none';if(file.files[0]){previewURL=URL.createObjectURL(file.files[0]);preview.src=previewURL;preview.style.display='block';}};
+document.querySelector('#recognize').onclick=async()=>{
+ if(busy)return;
+ if(!file.files[0]&&!strokes.length){status.textContent='请先写一个单词或上传图片';return;}
+ if(file.files[0]?.size>5*1024*1024){status.textContent='图片需小于 5 MB';return;}
+ busy=true;document.querySelectorAll('button,input').forEach(el=>el.disabled=true);status.textContent='正在本地识别…';text.textContent='—';details.textContent='';
+ try{const blob=file.files[0]||await new Promise(resolve=>pad.toBlob(resolve,'image/png'));const response=await fetch('/recognize',{method:'POST',headers:{'Content-Type':blob.type},body:blob});const result=await response.json();if(!response.ok)throw Error(result.error||'识别失败');text.textContent=result.text||'（未识别出文字）';details.textContent=`置信度：${(result.confidence*100).toFixed(1)}% · 推理耗时：${result.elapsed_ms} ms · ${result.model}`;status.textContent='识别完成，可以继续试写';}
+ catch(e){status.textContent=e.message;}
+ finally{busy=false;document.querySelectorAll('button,input').forEach(el=>el.disabled=false);}
+};paint();
+</script>
+</html>

@@ -1,0 +1,9 @@
+{% extends 'workshop/base.html' %}
+{% block breadcrumb %}任务已被删除{% endblock %}
+{% block content %}
+<section class="panel empty" role="status">
+  <h1>任务已被删除</h1>
+  <p>请返回任务列表查看其他任务。</p>
+  <a class="button" href="{% url 'tasks' %}?child={{ child.pk }}">返回任务列表</a>
+</section>
+{% endblock %}

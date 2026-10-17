@@ -1,0 +1,22 @@
+{% load growth %}
+{% if user.is_parent and parent_task_actions and not archive %}
+<div class="task-row task-row-managed">
+  <span class="subject-icon {% cycle 'sage' 'peach' 'lavender' 'gold' %}">{{ task.subject.icon }}</span>
+  <div class="task-info">
+    <h3 class="task-title"><a href="{% url 'task_detail' task.pk %}">{{ task.title }}</a><span class="badge {{ task.phase|phase_class }}">{{ task|task_status:user }}</span></h3>
+    <p>{{ task.subject.name }} <span>·</span> {% if task.kind == 'daily' %}{{ task.day|date:'m 月 d 日' }} · 日常{% elif task.due_date %}{{ task.due_date|date:'m 月 d 日' }} 截止{% else %}长期 · 无截止日期{% endif %}</p>
+  </div>
+  <div class="task-row-actions" aria-label="{{ task.title }}的操作">
+    <a class="button outline" href="{% url 'task_detail' task.pk %}" title="查看任务" aria-label="查看任务"><span aria-hidden="true">🔍</span></a>
+    {% if not task.closed %}<a class="button outline" href="{% url 'task_edit' task.pk %}" title="编辑任务" aria-label="编辑任务"><span aria-hidden="true">✏️</span></a>{% else %}<button class="button outline" disabled title="已完结任务不能编辑" aria-label="编辑任务"><span aria-hidden="true">✏️</span></button>{% endif %}
+    {% if not task.current_id and not task.closed %}
+    <form method="post" action="{% url 'task_delete' task.pk %}?{{ request.GET.urlencode }}">
+      {% csrf_token %}
+      <button type="submit" class="button outline danger" title="删除任务" aria-label="删除任务" data-confirm="确认删除任务「{{ task.title }}」？删除后将从任务列表移除。"><span aria-hidden="true">🗑️</span></button>
+    </form>
+    {% else %}<button class="button outline danger" disabled title="正式提交或已完结的任务不能删除" aria-label="删除任务"><span aria-hidden="true">🗑️</span></button>{% endif %}
+  </div>
+</div>
+{% else %}
+<a class="task-row" href="{% url 'task_detail' task.pk %}"><span class="subject-icon {% cycle 'sage' 'peach' 'lavender' 'gold' %}">{{ task.subject.icon }}</span><div class="task-info"><h3>{{ task.title }}</h3><p>{{ task.subject.name }} <span>·</span> {% if task.kind == 'daily' %}{{ task.day|date:'m 月 d 日' }} · 日常{% elif task.due_date %}{{ task.due_date|date:'m 月 d 日' }} 截止{% else %}长期 · 无截止日期{% endif %}</p></div><span class="badge {{ task.phase|phase_class }}">{{ task|task_status:user }}</span><span class="row-arrow">›</span></a>
+{% endif %}
