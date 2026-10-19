@@ -6,3 +6,4 @@ jsonschema>=4.23,<5
 python-magic>=0.4.27
 Authlib>=1.4,<2
 gunicorn>=23,<24
+pypdf>=6.21,<7

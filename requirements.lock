@@ -21,6 +21,7 @@ packaging==26.3
 psycopg-binary==3.3.6
 psycopg==3.3.6
 pycparser==3.11
+pypdf==6.21.1
 python-magic==0.4.27
 referencing==0.37.0
 rpds-py==0.30.0
