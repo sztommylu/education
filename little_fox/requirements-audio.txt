@@ -1,2 +1,2 @@
 pypdf>=6.21,<7
-lameenc>=1.9,<2
+edge-tts>=7.3,<8

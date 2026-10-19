@@ -1,62 +1,79 @@
 #!/usr/bin/env python3
-"""Generate local MP3 pronunciation files for the PDF vocabulary.
+"""Generate natural sounding MP3 pronunciation files for PDF vocabulary.
 
-Requires eSpeak NG and the optional Python package ``lameenc``.
+Requires the optional Python package ``edge-tts`` and network access while
+generating. The finished page plays the saved files without network access.
 """
 
 from __future__ import annotations
 
 import argparse
-import io
-import subprocess
-import wave
+import asyncio
 from pathlib import Path
 
-import lameenc
+import edge_tts
 
 from generate_vocab_html import audio_filename, read_episodes
 
 
-def make_mp3(word: str, espeak: str, data_parent: Path | None) -> bytes:
-    command = [espeak]
-    if data_parent is not None:
-        command.append(f"--path={data_parent}")
-    command.extend(["-v", "en-us", "-s", "145", "--stdout", word])
-    result = subprocess.run(command, check=True, capture_output=True)
-    with wave.open(io.BytesIO(result.stdout)) as wav:
-        if wav.getnchannels() != 1 or wav.getsampwidth() != 2:
-            raise ValueError(f"不支持的语音格式：{word}")
-        encoder = lameenc.Encoder()
-        encoder.set_in_sample_rate(wav.getframerate())
-        encoder.set_channels(1)
-        encoder.set_bit_rate(48)
-        encoder.set_quality(2)
-        return encoder.encode(wav.readframes(wav.getnframes())) + encoder.flush()
+async def generate_one(word: str, target: Path, voice: str) -> None:
+    temporary = target.with_suffix(".tmp")
+    try:
+        for attempt in range(3):
+            try:
+                await edge_tts.Communicate(word, voice, rate="-10%").save(str(temporary))
+                if temporary.stat().st_size < 1000:
+                    raise ValueError(f"音频文件过小：{word}")
+                temporary.replace(target)
+                return
+            except Exception:
+                temporary.unlink(missing_ok=True)
+                if attempt == 2:
+                    raise
+                await asyncio.sleep(2 * (attempt + 1))
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+async def generate_all(words: list[str], output: Path, voice: str, force: bool) -> None:
+    semaphore = asyncio.Semaphore(4)
+    failed: list[str] = []
+    created = 0
+
+    async def work(word: str) -> None:
+        nonlocal created
+        target = output / audio_filename(word)
+        if not force and target.is_file() and target.stat().st_size > 0:
+            return
+        async with semaphore:
+            try:
+                await generate_one(word, target, voice)
+                created += 1
+            except Exception as exc:
+                failed.append(f"{word}: {exc}")
+
+    await asyncio.gather(*(work(word) for word in words))
+    print(f"已生成 {created} 个音频文件；共 {len(words)} 个不同词条。")
+    if failed:
+        raise RuntimeError("以下词条生成失败：\n" + "\n".join(failed))
 
 
 def main() -> None:
     script_dir = Path(__file__).resolve().parent
-    parser = argparse.ArgumentParser(description="为 Cinderella PDF 词条生成离线发音")
+    parser = argparse.ArgumentParser(description="为 Cinderella PDF 词条生成自然发音 MP3")
     parser.add_argument("--pdf", type=Path, default=script_dir / "02.Cinderella-words.pdf")
     parser.add_argument("--output", type=Path, default=script_dir / "audio")
-    parser.add_argument("--espeak", default="espeak-ng")
-    parser.add_argument("--data-parent", type=Path)
+    parser.add_argument("--voice", default="en-US-AriaNeural")
+    parser.add_argument("--force", action="store_true", help="重新生成已有音频")
     args = parser.parse_args()
 
-    words = dict.fromkeys(
+    words = list(dict.fromkeys(
         str(row["word"])
         for episode in read_episodes(args.pdf)
         for row in episode["rows"]
-    )
+    ))
     args.output.mkdir(parents=True, exist_ok=True)
-    created = 0
-    for word in words:
-        target = args.output / audio_filename(word)
-        if target.is_file() and target.stat().st_size > 0:
-            continue
-        target.write_bytes(make_mp3(word, args.espeak, args.data_parent))
-        created += 1
-    print(f"已生成 {created} 个音频文件；共 {len(words)} 个不同词条。")
+    asyncio.run(generate_all(words, args.output, args.voice, args.force))
 
 
 if __name__ == "__main__":

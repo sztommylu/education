@@ -96,6 +96,16 @@ def render_episode(episode: dict[str, object]) -> str:
         word = str(entry["word"])
         meaning = str(entry["meaning"])
         phrase = str(entry["phrase"])
+        audio_path = f"audio/{audio_filename(word)}"
+        online_button = (
+            "<button class=\"speak online\" type=\"button\" "
+            f"data-word=\"{html.escape(word, quote=True)}\" "
+            f"data-audio=\"{audio_path}\" data-online=\"true\" "
+            f"aria-label=\"在线朗读 {html.escape(word, quote=True)}\">"
+            "<span aria-hidden=\"true\">🌐</span><span>在线</span></button>"
+            if re.fullmatch(r"[A-Za-z]+(?:['’-][A-Za-z]+)*", word)
+            else ""
+        )
         search_text = f"{word} {meaning} {phrase}".lower()
         rows.append(
             "<tr class=\"word-row\" "
@@ -104,11 +114,12 @@ def render_episode(episode: dict[str, object]) -> str:
             f"<td class=\"word\">{html.escape(word)}</td>"
             f"<td class=\"meaning\">{html.escape(meaning)}</td>"
             f"<td class=\"phrase\">{html.escape(phrase)}</td>"
-            "<td><button class=\"speak\" type=\"button\" "
+            "<td><span class=\"audio-actions\"><button class=\"speak\" type=\"button\" "
             f"data-word=\"{html.escape(word, quote=True)}\" "
-            f"data-audio=\"audio/{audio_filename(word)}\" "
+            f"data-audio=\"{audio_path}\" "
             f"aria-label=\"朗读 {html.escape(word, quote=True)}\">"
-            "<span aria-hidden=\"true\">🔊</span><span>发音</span></button></td></tr>"
+            "<span aria-hidden=\"true\">🔊</span><span>离线</span></button>"
+            f"{online_button}</span></td></tr>"
         )
     return f"""
     <section class="episode" id="episode-{number}" data-episode="{number}">
@@ -181,9 +192,12 @@ def build_html(episodes: list[dict[str, object]], source_name: str) -> str:
     .word {{ width:22%; color:#63283f; font-family:Georgia,serif; font-size:1.08rem; font-weight:700; }}
     .meaning {{ width:25%; }}
     .phrase {{ width:34%; color:#51495a; font-family:Georgia,serif; font-size:.95rem; }}
+    .audio-actions {{ display:flex; gap:6px; align-items:center; }}
     .speak {{ display:inline-flex; gap:7px; align-items:center; padding:8px 11px; border:1px solid #ead8be;
       border-radius:999px; color:#6d3b24; background:#fff7e7; cursor:pointer; font:600 .82rem inherit; white-space:nowrap; }}
     .speak:hover {{ border-color:var(--gold); background:#ffefce; }}
+    .speak.online {{ color:#305977; background:#eef7fc; border-color:#c9dce9; }}
+    .speak.online:hover {{ background:#ddf0fa; }}
     .speak.playing {{ color:white; background:var(--wine); border-color:var(--wine); }}
     .empty {{ display:none; margin:0; padding:28px; text-align:center; color:var(--muted); }}
     .episode.no-results .empty {{ display:block; }}
@@ -193,7 +207,7 @@ def build_html(episodes: list[dict[str, object]], source_name: str) -> str:
     @media (max-width:680px) {{
       .hero {{ padding-top:45px; }} .toolbar {{ margin-inline:12px; flex-direction:column; align-items:stretch; }}
       .episode-title {{ grid-template-columns:auto 1fr; padding:17px; }} .count {{ display:none; }}
-      table {{ min-width:850px; }} th,td {{ padding:13px 16px; }}
+      table {{ min-width:920px; }} th,td {{ padding:13px 16px; }}
       th:nth-child(5),td:nth-child(5) {{ text-align:right; }}
       .speak span:last-child {{ display:none; }}
     }}
@@ -203,7 +217,7 @@ def build_html(episodes: list[dict[str, object]], source_name: str) -> str:
   <header class="hero">
     <div class="eyebrow">LITTLE FOX · WORD BOOK</div>
     <h1>Cinderella</h1>
-    <p class="lead">按 PDF 原有章节和序号整理词汇，短语栏保留 PDF 中的原文例句。点击发音按钮可听英文发音。</p>
+    <p class="lead">按 PDF 原有章节和序号整理词汇，短语栏保留 PDF 中的原文例句。单词可选在线发音，短语使用离线发音。</p>
     <div class="stats">{len(episodes)} EPISODES · {total} 条章节词汇</div>
   </header>
   <div class="toolbar">
@@ -211,12 +225,40 @@ def build_html(episodes: list[dict[str, object]], source_name: str) -> str:
     <nav aria-label="章节导航">{nav}</nav>
   </div>
   <main>{sections}</main>
-  <footer>内容提取自 {html.escape(source_name)} · 发音音频随页面提供</footer>
+  <footer>内容提取自 {html.escape(source_name)} · 在线发音来自 Free Dictionary API，无法获取时自动使用本地音频</footer>
   <script>
     const synth = window.speechSynthesis;
     const player = new Audio();
+    const onlineCache = new Map();
     let activeButton = null;
     let fallbackStarted = false;
+    let onlineAttempt = false;
+    let playRequest = 0;
+    async function onlineAudio(word) {{
+      if (onlineCache.has(word)) return onlineCache.get(word);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3500);
+      try {{
+        const response = await fetch(
+          'https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word),
+          {{signal: controller.signal}}
+        );
+        if (!response.ok) return null;
+        const entries = await response.json();
+        const sounds = entries.flatMap(entry => entry.phonetics || [])
+          .map(phonetic => phonetic.audio).filter(Boolean);
+        const source = sounds.find(url => /us/i.test(url)) || sounds[0];
+        if (!source) return null;
+        const url = new URL(source, 'https://api.dictionaryapi.dev/');
+        if (url.protocol !== 'https:') return null;
+        onlineCache.set(word, url.href);
+        return url.href;
+      }} catch (_) {{
+        return null;
+      }} finally {{
+        clearTimeout(timeout);
+      }}
+    }}
     function englishVoice() {{
       const voices = synth ? synth.getVoices() : [];
       return voices.find(v => /^en-(US|GB)/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang));
@@ -243,22 +285,39 @@ def build_html(episodes: list[dict[str, object]], source_name: str) -> str:
       }};
       synth.speak(utterance);
     }}
+    function playLocal(button) {{
+      onlineAttempt = false;
+      player.src = button.dataset.audio;
+      player.play().catch(() => {{
+        if (activeButton === button) speakWithBrowser(button);
+      }});
+    }}
     player.addEventListener('ended', clearPlaying);
     player.addEventListener('error', () => {{
-      if (activeButton) speakWithBrowser(activeButton);
+      if (!activeButton) return;
+      if (onlineAttempt) playLocal(activeButton);
+      else speakWithBrowser(activeButton);
     }});
     document.addEventListener('click', event => {{
       const button = event.target.closest('.speak');
       if (!button) return;
+      const request = ++playRequest;
       player.pause();
       if (synth) synth.cancel();
       clearPlaying();
       fallbackStarted = false;
+      onlineAttempt = false;
       activeButton = button;
       button.classList.add('playing');
-      player.src = button.dataset.audio;
-      player.play().catch(() => {{
-        if (activeButton === button) speakWithBrowser(button);
+      if (!button.dataset.online) {{ playLocal(button); return; }}
+      onlineAudio(button.dataset.word).then(url => {{
+        if (request !== playRequest) return;
+        if (!url) {{ playLocal(button); return; }}
+        onlineAttempt = true;
+        player.src = url;
+        player.play().catch(() => {{
+          if (request === playRequest && onlineAttempt) playLocal(button);
+        }});
       }});
     }});
     document.querySelector('#search').addEventListener('input', event => {{
